@@ -1,0 +1,7 @@
+*.csv
+*.mp4
+*.mov
+venv/
+__pycache__/
+/frames_output/
+
