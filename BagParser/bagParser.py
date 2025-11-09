@@ -37,7 +37,7 @@ tag_size = 0.16
 topic_nameInt = "/camera/image"   
 # AprilTag detector setup
 optionsInt = apriltag.DetectorOptions(families='tag16h5') #tag16h5: new  || tag36h11: og  
-detectorInt = apriltag.Detector(options)
+detectorInt = apriltag.Detector(optionsInt)
 fxInt, fyInt, cxInt, cyInt = 1806.68775, 1801.14087, 1882.18218, 1404.07528   # With OpenCV Calib Matrix. TODO: verify std units here same as openCV.
 tag_sizeInt = 0.007725     # The black square width ≈ 0.75 × 10.3 mm = 7.725 mm.   || 10.3 mm is with border
 
@@ -82,16 +82,16 @@ with AnyReader([Path(bag_path)]) as reader:
     video_writer_ext = None
     video_writer_int = None
 
-    with open(os.path.join(output_dir, csv_filename_Ext), "w", newline="") as csvfile, \
-         open(os.path.join(output_dir, tag_csv_filename_Ext), "w", newline="") as tag_csvfile, \
-            open(os.path.join(output_dir, csv_filename_Int), "w", newline="") as csvfileInt, \
-            open(os.path.join(output_dir, tag_csv_filename_Int), "w", newline="") as tag_csvfileInt:
+    with open(os.path.join(output_dir, csv_filename_Ext), "w", newline="") as csvfile_Ext, \
+         open(os.path.join(output_dir, tag_csv_filename_Ext), "w", newline="") as tag_csvfile_Ext, \
+            open(os.path.join(output_dir, csv_filename_Int), "w", newline="") as csvfile_Int, \
+            open(os.path.join(output_dir, tag_csv_filename_Int), "w", newline="") as tag_csvfile_Int:
 
         #######################################################################################
         # External Tag Detection Loop
 
-        writer_int = csv.writer(csvfile)
-        tag_writer_int = csv.writer(tag_csvfile)
+        writer_int = csv.writer(csvfile_Ext)
+        tag_writer_int = csv.writer(tag_csvfile_Ext)
         writer_int.writerow(["frame_id", "timestamp_ns", "timestamp_sec"])
         tag_writer_int.writerow(['tag_id', 'frame_id', 'tx', 'ty', 'tz', 'qx', 'qy', 'qz', 'qw'])
 
@@ -148,14 +148,40 @@ with AnyReader([Path(bag_path)]) as reader:
             video_writer_ext.write(cv_img)
 
             frame_id += 1
-
         print(f"Extracted {frame_id} frames from External Camera.")
+
+        # Compute Tag stability: Tag stability means different here, not all tags would be visible at all frames,
+        # but at least one should be at all times along with the static one. 
+
+        total_frames = frame_id 
+        with open('frames_output/Tag_stability_ext.csv', 'w', newline='') as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerow(['tag_id', 'stability_value'])
+            total_stability = 0
+            static_tag_id = 0  # Assuming tag ID 0 is static and always present.
+
+            # Caculate if every frame has at least one tag detected : do this for all tag id except the static tad_id
+            for f_id in range(total_frames):
+                tags_in_frame = [tag_id for tag_id, poses in tag_paths.items() 
+                                 if tag_id != static_tag_id and any(p[0] == f_id for p in poses)]
+
+                stability = 1 if tags_in_frame else 0
+
+            total_stability += stability / total_frames  # Normalize by total frames
+            writer.writerow(['Total Stability', total_stability])
+
+            # For static tag:
+            static_poses = tag_paths.get(static_tag_id, [])
+            static_stability = len(static_poses) / total_frames if total_frames > 0 else 0
+            writer.writerow(['Static Tag Stability', static_stability])
         
+        print("Stability metrics saved to tag_stability_ext.csv")  
+
         #######################################################################################
         # Internal Tag Detection Loop
         
-        writer_ext = csv.writer(csvfile)
-        tag_writer_ext = csv.writer(tag_csvfile)
+        writer_ext = csv.writer(csvfile_Int)
+        tag_writer_ext = csv.writer(tag_csvfile_Int)
         writer_ext.writerow(["frame_id", "timestamp_ns", "timestamp_sec"])
         tag_writer_ext.writerow(['tag_id', 'frame_id', 'tx', 'ty', 'tz', 'qx', 'qy', 'qz', 'qw'])
 
@@ -213,29 +239,29 @@ with AnyReader([Path(bag_path)]) as reader:
 
         print(f"Extracted {frame_id} frames from Internal Camera.")
 
+        # Compute Tag stability: Ideally all tags should be detected at all frames. This would give stability = 1.
+
+        total_frames = frame_id 
+        with open('frames_output/Tag_stability_int.csv', 'w', newline='') as csvfile:
+            writer = csv.writer(csvfile)
+            writer.writerow(['tag_id', 'stability_value'])
+            total_stability = 0
+            for tag_id, poses in tag_paths.items():
+                stability = len(poses) / total_frames if total_frames > 0 else 0
+                total_stability += stability
+                writer.writerow([tag_id, stability])
+            
+            # Calculate and write the average stability
+            avg_stability = total_stability / len(tag_paths) if tag_paths else 0
+            writer.writerow(['Average', avg_stability])
+        
+        print("Stability metrics saved to tag_stability_int.csv")
+
     if video_writer_ext is not None:
         video_writer_ext.release()
 
     if video_writer_int is not None:
         video_writer_int.release()
-
-#######################################################################################
-#                   Relative Pose wrt to Static Tag
-#######################################################################################
-
-
-#######################################################################################
-#                  Plot the Fused Centroid Path of External Tag
-#######################################################################################
-
-
-#######################################################################################
-#          Plot the Relative Tag Pose for all Internal Tags wrt Timestamp
-#######################################################################################
-
-#######################################################################################
-#                           Telemetry Data Plot
-#######################################################################################
 
 
 #######################################################################################
