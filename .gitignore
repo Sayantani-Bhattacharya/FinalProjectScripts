@@ -3,5 +3,5 @@
 *.mov
 venv/
 __pycache__/
-/frames_output/
+frames_output/
 
