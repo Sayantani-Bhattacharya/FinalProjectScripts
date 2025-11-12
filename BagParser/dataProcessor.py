@@ -407,7 +407,7 @@ def pose_fusion(poses):  #frame_idx might be needed to be removed evrywhere in t
 
     return ( avg_translation[0], avg_translation[1], avg_translation[2],
             avg_quaternion[0], avg_quaternion[1], avg_quaternion[2], avg_quaternion[3])
- 
+
 # TODO: Can be later merged with plot_relative_pose_indv.
 '''
 Plot the 3D relative pose of a specific external tag with respect to a static tag (ID = static_tag_id).
@@ -467,92 +467,10 @@ def plot_relative_pose_indvExt(tag_id, ax_indv, all_frame_poses):
     ax_indv.set_title(f'Relative Path of Tag {tag_id} to Static Tag')
     plt.show()
 
-
-
-def plot_centroid_path(ax_centroid, all_frame_poses):   
-    # Clear the plot
-    ax_centroid.clear()
-
-    # Centroid poses from all tags
-    centroid_poses = []
-    fused_centroid_path = []
-    tx_rel = []
-    ty_rel = []
-    tz_rel = []
-
-    total_frames = max(p[0] for p in all_frame_poses) + 1  # Assuming frame indices start from 0
-    start_frame = 0
-    end_frame = total_frames
-    for frame_idx in range(total_frames):
-        # Collecting same frame index poses, all tags.
-        current_frame_poses = get_current_frame_poses(all_frame_poses, frame_idx)
-
-        # Iterate through all tag paths and plot their centroid paths
-        for pose in current_frame_poses:
-            centroids = []
-            # for pose in poses:
-            tag_id = pose[0]
-            _, tx, ty, tz, qx, qy, qz, qw = pose
-            t = np.array([[1, 0, 0, tx],
-                            [0, 1, 0, ty],
-                            [0, 0, 1, tz],
-                            [0, 0, 0, 1]])
-            if tag_id == 1:
-                T_centroid = T_C1 @ t
-            elif tag_id == 2:
-                T_centroid = T_C2 @ t
-            elif tag_id == 3:
-                T_centroid = T_C3 @ t
-            elif tag_id == 4:
-                T_centroid = T_C4 @ t
-            elif tag_id == 5:
-                T_centroid = T_C5 @ t
-            else:
-                T_centroid = np.eye(4)
-
-            # Extract translation and orientation
-            tx, ty, tz = T_centroid[:3, 3]
-            rotation_matrix = T_centroid[:3, :3]
-            quaternion = R.from_matrix(rotation_matrix).as_quat()  # (qx, qy, qz, qw)
-            qx, qy, qz, qw = quaternion
-            centroid = [tx, ty, tz, qx, qy, qz, qw]
-            centroid_poses.append(centroid)
-            
-        # Fuse the centroid poses from all visible tags to get a more stable estimate.
-        fused_pose = pose_fusion(centroid_poses)
-
-        # TODO: No visible tags case: currently returning None, should handle it better.
-        if fused_pose is not None:
-            fused_centroid_path.append(fused_pose)
-
-    # Convert centroids to numpy array for plotting
-    # centroids.append(np.array(fused_pose))
-    # if fused_pose is None: 
-    # TODO: change the logic, to have empty or something printed out not just return. no visible tags
-    #     return
-    # fused_centroid_path = np.array(fused_centroid_path)
-
-    print("Fused Centroid Path Length: ", len(fused_centroid_path))
-    print("#######################################")
-    # print("Fused Centroid Path x: ", np.array(fused_centroid_path)[:, 0])
-
-    if len(fused_centroid_path) > 0:
-        ax_centroid.plot(np.array(fused_centroid_path)[:, 0], np.array(fused_centroid_path)[:, 1], np.array(fused_centroid_path)[:, 2], c='r')
-    else:
-        pass # or use fused_centroid_path = [[0,0,0]] to plot a point at origin.
-
-
-
-    # Set labels and title
-    ax_centroid.set_xlabel('X (m)')
-    ax_centroid.set_ylabel('Y (m)')
-    ax_centroid.set_zlabel('Z (m)')
-    ax_centroid.set_title('Cube Centroid Path')
-    ax_centroid.legend()
-    plt.show()
-    # plt.pause(0.01)
-
-def plot_centroid_path(ax_centroid, all_frame_poses, start_frame=0, end_frame=None):   
+'''
+Plot the 3D centroid path of the cube relative to the static tag ID = 0 over all frames.
+'''
+def plot_centroid_path(ax_centroid, all_frame_poses, start_frame=0, end_frame=None, axis_equal=False):   
     # Clear the plot
     ax_centroid.clear()
 
@@ -574,6 +492,7 @@ def plot_centroid_path(ax_centroid, all_frame_poses, start_frame=0, end_frame=No
         # Collecting same frame index poses, all tags.
         current_frame_poses = get_current_frame_poses(all_frame_poses, frame_idx)
 
+        
         # Iterate through all tag paths and plot their centroid paths
         for pose in current_frame_poses:
             centroids = []
@@ -594,27 +513,53 @@ def plot_centroid_path(ax_centroid, all_frame_poses, start_frame=0, end_frame=No
                 T_centroid = T_C4 @ t
             elif tag_id == 5:
                 T_centroid = T_C5 @ t
+            elif tag_id == 0:
+                static_tag_pose = pose            
             else:
                 T_centroid = np.eye(4)
 
-            # Extract translation and orientation
-            tx, ty, tz = T_centroid[:3, 3]
-            rotation_matrix = T_centroid[:3, :3]
-            quaternion = R.from_matrix(rotation_matrix).as_quat()  # (qx, qy, qz, qw)
-            qx, qy, qz, qw = quaternion
-            centroid = [tx, ty, tz, qx, qy, qz, qw]
-            centroid_poses.append(centroid)
-            
-        # Fuse the centroid poses from all visible tags for stable estimate.
+            if (tag_id != 0):
+                # Extract translation and orientation
+                tx, ty, tz = T_centroid[:3, 3]
+                rotation_matrix = T_centroid[:3, :3]
+                quaternion = R.from_matrix(rotation_matrix).as_quat()  # (qx, qy, qz, qw)
+                qx, qy, qz, qw = quaternion
+                centroid = [tx, ty, tz, qx, qy, qz, qw]
+                centroid_poses.append(centroid)
+
+        # Fuse the centroid poses from all visible tags to get a more stable estimate.
         fused_pose = pose_fusion(centroid_poses)
 
         # TODO: No visible tags case: currently returning None, should handle it better.
         if fused_pose is not None:
-            fused_centroid_path.append(fused_pose)
+            relative_fused_pose = []
+
+            # Relative to static tag logic to be added here.
+            # static_tag_pose --> (frame_idx, tx, ty, tz, qx, qy, qz, qw)
+            # fused_pose --> (tx, ty, tz, qx, qy, qz, qw)
+            # translation relative to static tag
+            relative_fused_pose.append(fused_pose[0] - static_tag_pose[1])
+            relative_fused_pose.append(fused_pose[1] - static_tag_pose[2])
+            relative_fused_pose.append(fused_pose[2] - static_tag_pose[3])
+            # rotation relative to static tag
+            R_fused = R.from_quat(fused_pose[3:7]).as_matrix()
+            R_static = R.from_quat(static_tag_pose[5:9]).as_matrix()
+            R_rel = R_static.T @ R_fused
+            quaternion_rel = R.from_matrix(R_rel).as_quat()
+            relative_fused_pose.append(quaternion_rel[0])
+            relative_fused_pose.append(quaternion_rel[1])
+            relative_fused_pose.append(quaternion_rel[2])
+            relative_fused_pose.append(quaternion_rel[3])
+
+            fused_centroid_path.append(relative_fused_pose)
 
 
-    print("Fused Centroid Path Length: ", len(fused_centroid_path))
-    print("#######################################")
+
+
+    # if fused_pose is None: 
+    # TODO: change the logic, to have empty or something printed out not just return. no visible tags
+    #     return
+    # fused_centroid_path = np.array(fused_centroid_path)
 
     if len(fused_centroid_path) > 0:
         ax_centroid.plot(np.array(fused_centroid_path)[:, 0], np.array(fused_centroid_path)[:, 1], np.array(fused_centroid_path)[:, 2], c='r')
@@ -622,14 +567,37 @@ def plot_centroid_path(ax_centroid, all_frame_poses, start_frame=0, end_frame=No
         pass # or use fused_centroid_path = [[0,0,0]] to plot a point at origin.
 
     # Set labels and title
+    # I want all x,y and z range to be same for better visualization: ans use the largest range among them.
+    
     ax_centroid.set_xlabel('X (m)')
     ax_centroid.set_ylabel('Y (m)')
     ax_centroid.set_zlabel('Z (m)')
+
+    if axis_equal:
+        ax_centroid.set_box_aspect([1,1,1])  # Aspect ratio is 1:1:1
+
+        # --- Make equal scale automatically ---
+        x = np.array(fused_centroid_path)[:, 0]
+        y = np.array(fused_centroid_path)[:, 1]
+        z = np.array(fused_centroid_path)[:, 2]
+        max_range = np.ptp([x, y, z]).max() / 2.0
+        mid_x = (np.max(x) + np.min(x)) / 2.0
+        mid_y = (np.max(y) + np.min(y)) / 2.0
+        mid_z = (np.max(z) + np.min(z)) / 2.0
+
+        ax_centroid.set_xlim(mid_x - max_range, mid_x + max_range)
+        ax_centroid.set_ylim(mid_y - max_range, mid_y + max_range)
+        ax_centroid.set_zlim(mid_z - max_range, mid_z + max_range)
+
+
+
     ax_centroid.set_title('Cube Centroid Path')
     ax_centroid.legend()
     plt.show()
 
-
+'''
+Plot all external tag paths in 3D space.
+'''
 def plot_all_ext_tags(ax_all, all_frame_poses):
     ax_all.clear()  # Clear the previous plot
     tag_paths = {}
@@ -659,7 +627,6 @@ def plot_all_ext_tags(ax_all, all_frame_poses):
     ax_all.legend()
     ax_all.set_title('All External Tag Paths')
     plt.show()
-    # plt.pause(0.01)
 
 #######################################################################################
 #               Int Tag Thresholding to prevent false positives
@@ -707,6 +674,10 @@ if __name__ == "__main__":
     fig_centroid = plt.figure()
     ax_centroid = fig_centroid.add_subplot(111, projection='3d')
 
+    ###########################
+            # Telemetry
+    ###########################
+
 
     while True:
 
@@ -730,8 +701,12 @@ if __name__ == "__main__":
         all_frame_poses = read_frame_poses()
         curr_tag_id = 5
         # plot_all_ext_tags(ax_centroid, all_frame_poses)
-        plot_centroid_path(ax_centroid, all_frame_poses)
-        # plot_centroid_path(ax_centroid, all_frame_poses, start_frame=0, end_frame=700)
+        plot_centroid_path(ax_centroid, all_frame_poses, axis_equal=False)
+
+
+        ###########################
+                # Telemetry
+        ###########################
 
 
 
