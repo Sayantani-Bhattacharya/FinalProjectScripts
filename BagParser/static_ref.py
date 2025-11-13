@@ -81,8 +81,8 @@ def calculate_relative_poses(csv_file):
             internal_tag_id_rel_pose_map.append((tag_id, mean_pos, mean_quaternion))
     return internal_tag_id_rel_pose_map
 
-group1 = [3,10,15 , 9, 5 , 7, 8 , 13, 6]
-group2 = [2, 14, 12, 11 , 1 , 0, 17, 16, 18] 
+group1 = [3,10,15,9,5,7,8,13,6]
+group2 = [2,14,12,11,1,0,17,16,18]
 
 # # Visualize the relative poses in a 3D plot
 # def visualize_relative_poses(rel_pose_map):
@@ -133,12 +133,11 @@ def visualize_relative_poses(rel_pose_map):
     for i in range(3):
         ax.plot([0, axes[i, 0]], [0, axes[i, 1]], [0, axes[i, 2]], color=['r', 'g', 'b'][i])
 
-    # Plot a plane along the static pose at origin
-    xx, zz = np.meshgrid(np.linspace(-0.1, 0.1, 10), np.linspace(-0.1, 0.1, 10))
+    # Plot a larger plane along the static pose at origin
+    xx, zz = np.meshgrid(np.linspace(-0.5, 0.5, 20), np.linspace(-0.5, 0.5, 20))
     yy = np.zeros_like(xx)
     ax.plot_surface(xx, yy, zz, alpha=0.2, color='gray')
     ax.text(0, 0, 0, 'Static Plane', color='gray', fontsize=10)
-
 
     # Define groups
     group1 = [3,10,15,9,5,7,8,13,6]
@@ -175,6 +174,10 @@ def visualize_relative_poses(rel_pose_map):
     c1, n1 = fit_plane(pts1)
     c2, n2 = fit_plane(pts2)
 
+    # Print the equations of the planes
+    print(f"Plane Group 1: normal = {n1}, point = {c1}")
+    print(f"Plane Group 2: normal = {n2}, point = {c2}")
+
     # Plot planes
     plot_plane(ax, c1, n1, 'cyan', 'Plane Group 1')
     plot_plane(ax, c2, n2, 'magenta', 'Plane Group 2')
@@ -184,10 +187,35 @@ def visualize_relative_poses(rel_pose_map):
     angle_deg = np.degrees(angle_rad)
     print(f"Angle between planes: {angle_deg:.2f}°")
 
+
+    # --- Compute angle between n1 and n2 ---
+    angle_rad_1 = np.arccos(np.clip(np.dot(n1, n2), -1.0, 1.0))
+    angle_deg_1 = np.degrees(angle_rad_1)
+    print(f"Angle between Plane Group 1 and Plane Group 2: {angle_deg_1:.2f}°")
+    
+    # --- Compute angle between static plane (Y=0 plane) and n1 ---
+    static_plane_normal = np.array([0, 1, 0])  # Normal vector of the static plane (Y=0)
+    angle_rad_static_n1 = np.arccos(np.clip(np.dot(n1, static_plane_normal), -1.0, 1.0))
+    angle_deg_static_n1 = np.degrees(angle_rad_static_n1)
+    print(f"Angle between static plane and Plane Group 1: {angle_deg_static_n1:.2f}°")
+    
+    # --- Compute angle between static plane and n2 ---
+    angle_rad_2 = np.arccos(np.clip(np.dot(n2, static_plane_normal), -1.0, 1.0))
+    angle_deg_2 = np.degrees(angle_rad_2)
+    print(f"Angle between static plane and Plane Group 2: {angle_deg_2:.2f}°")
+    
+
     ax.set_xlabel('X')
     ax.set_ylabel('Y')
     ax.set_zlabel('Z')
     ax.legend()
+    
+    # I want the plot x,y,z range to be same
+    max_range = 0.6
+    ax.set_xlim([-max_range/2, max_range/2])
+    ax.set_ylim([-max_range/2, max_range/2])
+    ax.set_zlim([-max_range/2, max_range/2])    
+    # plt.axis('equal')
     plt.show()
 
     # --- Project points onto their respective planes ---
@@ -216,7 +244,7 @@ def visualize_relative_poses(rel_pose_map):
         plt.colorbar(label='Distance from plane (m)')
         plt.xlabel('u-axis (in-plane)')
         plt.ylabel('v-axis (in-plane)')
-        plt.axis('equal')
+        
         plt.show()
 
     # Plot both groups
@@ -228,9 +256,4 @@ if __name__ == "__main__":
     csv_file = 'ref_data/tag_paths_ref.csv'
     rel_pose_map = calculate_relative_poses(csv_file)
     visualize_relative_poses(rel_pose_map)
-    # for tag_id, pos, quat in rel_pose_map:
-    #     print(f'Tag ID: {tag_id}')
-    #     print(f'Relative Position: {pos}')
-    #     print(f'Relative Orientation (quaternion): {quat}')
-    #     print('---')
 
