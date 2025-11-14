@@ -95,7 +95,6 @@ def unfilter_rel_paths():
         
     return rel_tag_poses
    
-
 def filter_false_positive():
     # Read CSV and group by tag_id
     tag_poses = {}
@@ -155,10 +154,9 @@ def filter_false_positive():
             rel_tag_poses[frame_id][tag_id] = (rel_pos, rel_rot)
         
     return rel_tag_poses
-            
 
 #######################################################################################
-#                   Relative Pose wrt to Static Tag
+#          Plot the Relative Tag Pose for all Internal Tags wrt Timestamp
 #######################################################################################
 
 # # Relative poses global variable
@@ -173,7 +171,7 @@ def plot_3d_relative_pose(ax_relative):
     ax_relative.clear()  # Clear the previous plot
     # Read CSV and group by tag_id
     tag_paths = {}
-    with open('frames_output/tag_paths_int.csv', 'r') as f: 
+    with open('frames_output_Cut_PT4/tag_paths_int.csv', 'r') as f: 
         reader = csv.DictReader(f)
         for row in reader:
             tag_id = int(row['tag_id'])
@@ -242,7 +240,7 @@ Plot the 3D relative pose of a specific tag relative to Static Tag over time.
 def plot_relative_pose_indv(tag_id, ax_indv):
     ax_indv.clear()  # Clear the previous plot
     tag_paths = {}
-    with open('frames_output/tag_paths_int.csv', 'r') as f:
+    with open('frames_output_Cut_PT4/tag_paths_int.csv', 'r') as f:
         reader = csv.DictReader(f)
         for row in reader:
             t_id = int(row['tag_id'])
@@ -302,7 +300,7 @@ Plot the individual x, y, z signals of a specific tag separately with respect to
 def plot_idv(tag_id, ax_x = None, ax_y= None, ax_z= None):
     # ax_indv_axis.clear()  # Clear the previous plot
     tag_paths = {}
-    with open('frames_output/tag_paths_int.csv', 'r') as f:
+    with open('frames_output_Cut_PT4/tag_paths_int.csv', 'r') as f:
         reader = csv.DictReader(f)
         for row in reader:
             t_id = int(row['tag_id'])
@@ -531,7 +529,6 @@ def plot_filtered_tags(rel_tag_poses, ax_x, ax_y, ax_z, tagA=2, tagB=4, tagC=5, 
     plt.tight_layout(rect=[0, 0, 1, 0.96])
     plt.show()
 
-
 """
     Calculate the relative pose from the start_pose to the current_pose.
     Both poses are given as (position, rotation) tuples.
@@ -543,25 +540,27 @@ def calculate_rel_pose(current_pose, start_pose):
 
     # Calculate relative rotation
     rel_rot = start_rot.inv() * curr_rot
+    rel_quat = rel_rot.as_quat()  # (x, y, z, w)
 
     # Calculate relative position
     rel_pos = start_rot.inv().apply(curr_pos - start_pos)
 
-    return rel_pos
+    return (rel_pos, rel_quat)
 
 '''
 Plot the individual x, y, z, roll, pitch, yaw signals of multiple specific filtered tags over time: Displcement from initial position.
 '''
-def plot_filtered_tags_displacement(rel_tag_poses, ax_x, ax_y, ax_z, tagA=None, tagB=None, tagC=None, tagD=None):
+def plot_filtered_tags_displacement(rel_tag_poses, ax_x, ax_y, ax_z, ax_roll, ax_pitch, ax_yaw, tagA=None, tagB=None, tagC=None, tagD=None):
     ax_x.clear()
     ax_y.clear()
     ax_z.clear()
 
     frame_idxs = sorted(rel_tag_poses.keys())
-    tx_A, ty_A, tz_A = [], [], []
-    tx_B, ty_B, tz_B = [], [], []
-    tx_C, ty_C, tz_C = [], [], []
-    tx_D, ty_D, tz_D = [], [], []
+
+    tx_A, ty_A, tz_A, roll_A, pitch_A, yaw_A = [], [], [], [], [], []
+    tx_B, ty_B, tz_B, roll_B, pitch_B, yaw_B = [], [], [], [], [], []
+    tx_C, ty_C, tz_C, roll_C, pitch_C, yaw_C = [], [], [], [], [], []
+    tx_D, ty_D, tz_D, roll_D, pitch_D, yaw_D = [], [], [], [], [], []
 
     default_value = 0
 
@@ -588,48 +587,81 @@ def plot_filtered_tags_displacement(rel_tag_poses, ax_x, ax_y, ax_z, tagA=None, 
     for frame_idx in frame_idxs:
         poses = rel_tag_poses[frame_idx]
         if tagA in poses:
-            pos_A = calculate_rel_pose(poses[tagA], start_pos[tagA])
+            pos_A, quat_A = calculate_rel_pose(poses[tagA], start_pos[tagA])
             tx_A.append(pos_A[0])
             ty_A.append(pos_A[1])
             tz_A.append(pos_A[2])
+            r = R.from_quat(quat_A)  
+            roll, pitch, yaw = r.as_euler('xyz', degrees=False)
+            roll_A.append(roll)
+            pitch_A.append(pitch)
+            yaw_A.append(yaw)
         else:
             tx_A.append(default_value)
             ty_A.append(default_value)
             tz_A.append(default_value)
+            roll_A.append(default_value)
+            pitch_A.append(default_value)
+            yaw_A.append(default_value)
         if tagB in poses:
-            pos_B = calculate_rel_pose(poses[tagB], start_pos[tagB])
+            pos_B, quat_B = calculate_rel_pose(poses[tagB], start_pos[tagB])
             tx_B.append(pos_B[0])
             ty_B.append(pos_B[1])
             tz_B.append(pos_B[2])
+            r = R.from_quat(quat_B)
+            roll, pitch, yaw = r.as_euler('xyz', degrees=False)
+            roll_B.append(roll)
+            pitch_B.append(pitch)
+            yaw_B.append(yaw)
+
         else:
             tx_B.append(default_value)
             ty_B.append(default_value)
             tz_B.append(default_value)
+            roll_B.append(default_value)
+            pitch_B.append(default_value)
+            yaw_B.append(default_value)
         if tagC in poses:
-            pos_C = calculate_rel_pose(poses[tagC], start_pos[tagC])
+            pos_C, quat_C = calculate_rel_pose(poses[tagC], start_pos[tagC])
             tx_C.append(pos_C[0])
             ty_C.append(pos_C[1])
             tz_C.append(pos_C[2])
+            r = R.from_quat(quat_C)
+            roll, pitch, yaw = r.as_euler('xyz', degrees=False)
+            roll_C.append(roll)
+            pitch_C.append(pitch)
+            yaw_C.append(yaw)
         else:
             tx_C.append(default_value)
             ty_C.append(default_value)
             tz_C.append(default_value)
+            roll_C.append(default_value)
+            pitch_C.append(default_value)
+            yaw_C.append(default_value)
         if tagD in poses:
-            pos_D = calculate_rel_pose(poses[tagD], start_pos[tagD])
+            pos_D, quat_D = calculate_rel_pose(poses[tagD], start_pos[tagD])
             tx_D.append(pos_D[0])
             ty_D.append(pos_D[1])
             tz_D.append(pos_D[2])
+            r = R.from_quat(quat_D)
+            roll, pitch, yaw = r.as_euler('xyz', degrees=False)
+            roll_D.append(roll)
+            pitch_D.append(pitch)
+            yaw_D.append(yaw)
         else:   
             tx_D.append(default_value)
             ty_D.append(default_value)
             tz_D.append(default_value)
+            roll_D.append(default_value)
+            pitch_D.append(default_value)
+            yaw_D.append(default_value)
 
     # Plot X: TODO: need to fix the lengths if some tags are missing in some frames.
     # Also separate each tag frame idxs plots.
     ax_x.plot(tx_A, label=f'Tag {tagA}', color='r')
     ax_x.plot(tx_B, label=f'Tag {tagB}', color='g')
     ax_x.plot(tx_C, label=f'Tag {tagC}', color='b')
-    ax_x.plot(tx_D, label=f'Tag {tagD}', color='m')
+    ax_x.plot(tx_D, label=f'Tag {tagD}', color='y')
     ax_x.set_xlabel('Frame Index')
     ax_x.set_ylabel('X Position (m)')
     ax_x.legend()
@@ -639,21 +671,52 @@ def plot_filtered_tags_displacement(rel_tag_poses, ax_x, ax_y, ax_z, tagA=None, 
     ax_y.plot(ty_A, label=f'Tag {tagA}', color='r')
     ax_y.plot(ty_B, label=f'Tag {tagB}', color='g')
     ax_y.plot(ty_C, label=f'Tag {tagC}', color='b')
-    ax_y.plot(ty_D, label=f'Tag {tagD}', color='m')
+    ax_y.plot(ty_D, label=f'Tag {tagD}', color='y')
     ax_y.set_xlabel('Frame Index')
     ax_y.set_ylabel('Y Position (m)')
     ax_y.legend()
     ax_y.grid()
 
     # Plot Z
-    ax_z.plot( tz_A, label=f'Tag {tagA}', color='r')
+    ax_z.plot(tz_A, label=f'Tag {tagA}', color='r')
     ax_z.plot(tz_B, label=f'Tag {tagB}', color='g')
     ax_z.plot(tz_C, label=f'Tag {tagC}', color='b')
-    ax_z.plot(tz_D, label=f'Tag {tagD}', color='m')
+    ax_z.plot(tz_D, label=f'Tag {tagD}', color='y')
     ax_z.set_xlabel('Frame Index')
     ax_z.set_ylabel('Z Position (m)')
     ax_z.legend()
     ax_z.grid()
+
+    # Plot Roll
+    ax_roll.plot(roll_A, label=f'Tag {tagA}', color='r')
+    ax_roll.plot(roll_B, label=f'Tag {tagB}', color='g')
+    ax_roll.plot(roll_C, label=f'Tag {tagC}', color='b')
+    ax_roll.plot(roll_D, label=f'Tag {tagD}', color='y')
+    ax_roll.set_xlabel('Frame Index')
+    ax_roll.set_ylabel('Roll (rad)')
+    ax_roll.legend()
+    ax_roll.grid()
+
+    # Plot Pitch
+    ax_pitch.plot(pitch_A, label=f'Tag {tagA}', color='r')
+    ax_pitch.plot(pitch_B, label=f'Tag {tagB}', color='g')
+    ax_pitch.plot(pitch_C, label=f'Tag {tagC}', color='b')
+    ax_pitch.plot(pitch_D, label=f'Tag {tagD}', color='y')
+    ax_pitch.set_xlabel('Frame Index')
+    ax_pitch.set_ylabel('Pitch (rad)')
+    ax_pitch.legend()
+    ax_pitch.grid()
+
+    # Plot Yaw
+    ax_yaw.plot(yaw_A, label=f'Tag {tagA}', color='r')
+    ax_yaw.plot(yaw_B, label=f'Tag {tagB}', color='g')
+    ax_yaw.plot(yaw_C, label=f'Tag {tagC}', color='b')
+    ax_yaw.plot(yaw_D, label=f'Tag {tagD}', color='y')
+    ax_yaw.set_xlabel('Frame Index')
+    ax_yaw.set_ylabel('Yaw (rad)')
+    ax_yaw.legend()
+    ax_yaw.grid()
+
     plt.tight_layout(rect=[0, 0, 1, 0.96])
     plt.show()
 
@@ -722,7 +785,7 @@ total_frames = 0
 # Funtion to read tag_paths_ext.csv to get current frame poses.
 def read_frame_poses():
     all_frame_poses = []
-    with open('frames_output/tag_paths_ext.csv', 'r') as f:
+    with open('frames_output_Cut_PT4/tag_paths_ext.csv', 'r') as f:
         reader = csv.DictReader(f)
         for row in reader:
             tag_id = int(row['tag_id'])
@@ -834,6 +897,86 @@ def plot_relative_pose_indvExt(tag_id, ax_indv, all_frame_poses):
     ax_indv.legend()
     ax_indv.set_title(f'Relative Path of Tag {tag_id} to Static Tag')
     plt.show()
+
+def calculate_centroid_path(all_frame_poses, start_frame=0, end_frame=None):
+
+    # Centroid poses from all tags
+    centroid_poses = []
+    fused_centroid_path = []
+    tx_rel = []
+    ty_rel = []
+    tz_rel = []
+
+    total_frames = max(p[0] for p in all_frame_poses) + 1  # Assuming frame indices start from 0
+    start_frame = 0
+    if (end_frame is None):
+        end_frame = total_frames
+
+    for frame_idx in range(start_frame, end_frame):
+        # Collecting same frame index poses, all tags.
+        current_frame_poses = get_current_frame_poses(all_frame_poses, frame_idx)
+        
+        # Iterate through all tag paths and plot their centroid paths
+        for pose in current_frame_poses:
+            centroids = []
+            # for pose in poses:
+            tag_id = pose[0]
+            _, _, tx, ty, tz, qx, qy, qz, qw = pose
+            t = np.array([[1, 0, 0, tx],
+                            [0, 1, 0, ty],
+                            [0, 0, 1, tz],
+                            [0, 0, 0, 1]])
+            if tag_id == 1:
+                T_centroid = T_C1 @ t
+            elif tag_id == 2:
+                T_centroid = T_C2 @ t
+            elif tag_id == 3:
+                T_centroid = T_C3 @ t
+            elif tag_id == 4:
+                T_centroid = T_C4 @ t
+            elif tag_id == 5:
+                T_centroid = T_C5 @ t
+            elif tag_id == 0:
+                static_tag_pose = pose            
+            else:
+                T_centroid = np.eye(4)
+
+            if (tag_id != 0):
+                # Extract translation and orientation
+                tx, ty, tz = T_centroid[:3, 3]
+                rotation_matrix = T_centroid[:3, :3]
+                quaternion = R.from_matrix(rotation_matrix).as_quat()  # (qx, qy, qz, qw)
+                qx, qy, qz, qw = quaternion
+                centroid = [tx, ty, tz, qx, qy, qz, qw]
+                centroid_poses.append(centroid)
+
+        # Fuse the centroid poses from all visible tags to get a more stable estimate.
+        fused_pose = pose_fusion(centroid_poses)
+
+        # TODO: No visible tags case: if fused_pose is None: currently returning None, should handle it better.
+        if fused_pose is not None:
+            relative_fused_pose = []
+
+            # Relative to static tag logic to be added here.
+            # static_tag_pose --> (frame_idx, tx, ty, tz, qx, qy, qz, qw)
+            # fused_pose --> (tx, ty, tz, qx, qy, qz, qw)
+            # translation relative to static tag
+            relative_fused_pose.append(fused_pose[0] - static_tag_pose[1])
+            relative_fused_pose.append(fused_pose[1] - static_tag_pose[2])
+            relative_fused_pose.append(fused_pose[2] - static_tag_pose[3])
+            # rotation relative to static tag
+            R_fused = R.from_quat(fused_pose[3:7]).as_matrix()
+            R_static = R.from_quat(static_tag_pose[5:9]).as_matrix()
+            R_rel = R_static.T @ R_fused
+            quaternion_rel = R.from_matrix(R_rel).as_quat()
+            relative_fused_pose.append(quaternion_rel[0])
+            relative_fused_pose.append(quaternion_rel[1])
+            relative_fused_pose.append(quaternion_rel[2])
+            relative_fused_pose.append(quaternion_rel[3])
+
+            fused_centroid_path.append(relative_fused_pose)
+    
+    return fused_centroid_path
 
 '''
 Plot the 3D centroid path of the cube relative to the static tag ID = 0 over all frames.
@@ -957,8 +1100,6 @@ def plot_centroid_path(ax_centroid, all_frame_poses, start_frame=0, end_frame=No
         ax_centroid.set_ylim(mid_y - max_range, mid_y + max_range)
         ax_centroid.set_zlim(mid_z - max_range, mid_z + max_range)
 
-
-
     ax_centroid.set_title('Cube Centroid Path')
     ax_centroid.legend()
     plt.show()
@@ -997,8 +1138,45 @@ def plot_all_ext_tags(ax_all, all_frame_poses):
     plt.show()
 
 #######################################################################################
-#          Plot the Relative Tag Pose for all Internal Tags wrt Timestamp
+#                         Plotting Int and Ext Signals Combined
 #######################################################################################
+
+def plot_combined(centroid_path, rel_tag_poses, centroid_x, centroid_y, centroid_z, ax_x1, ax_y1, ax_z1, ax_roll1, ax_pitch1, ax_yaw1, tagA=None, tagB=None, tagC = None, tagD=None):
+    
+    # Clear all axes
+    centroid_x.clear()
+    centroid_y.clear()
+    centroid_z.clear()
+    ax_x1.clear()
+    ax_y1.clear()
+    ax_z1.clear()
+    ax_roll1.clear()
+    ax_pitch1.clear()
+    ax_yaw1.clear()
+
+    # Plot centroid path signals
+    if len(centroid_path) > 0:
+        centroid_x.plot(np.array(centroid_path)[:, 0], label='Centroid X', color='c')
+        centroid_y.plot(np.array(centroid_path)[:, 1], label='Centroid Y', color='m')
+        centroid_z.plot(np.array(centroid_path)[:, 2], label='Centroid Z', color='y')
+
+    centroid_x.set_xlabel('Frame Index')
+    centroid_x.set_ylabel('Centroid X Position (m)')
+    centroid_x.legend()
+    centroid_x.grid()
+
+    centroid_y.set_xlabel('Frame Index')
+    centroid_y.set_ylabel('Centroid Y Position (m)')
+    centroid_y.legend()
+    centroid_y.grid()
+
+    centroid_z.set_xlabel('Frame Index')
+    centroid_z.set_ylabel('Centroid Z Position (m)')
+    centroid_z.legend()
+    centroid_z.grid()
+
+    # Plot internal tag signals
+    plot_filtered_tags_displacement(rel_tag_poses, ax_x1, ax_y1, ax_z1, ax_roll1, ax_pitch1, ax_yaw1, tagA=tagA, tagB=tagB, tagC=tagC, tagD=tagD)
 
 
 
@@ -1014,20 +1192,21 @@ def plot_all_ext_tags(ax_all, all_frame_poses):
 
 if __name__ == "__main__":
 
-
     ###########################
             # Internal
     ###########################
 
-    # fig = plt.figure(figsize=(12, 6))
-    # ax3 = fig.add_subplot(111, projection='3d')
+    # # fig = plt.figure(figsize=(12, 6))
+    # # ax3 = fig.add_subplot(111, projection='3d')
 
-    # ax4 = fig.add_subplot(234, projection='3d')
-    # ax5 = fig.add_subplot(235, projection='3d')
+    # # ax4 = fig.add_subplot(234, projection='3d')
+    # # ax5 = fig.add_subplot(235, projection='3d')
 
-    # Create subplots for x, y, z signals: for plot indv function.
-    fig, (ax_x, ax_y, ax_z) = plt.subplots(3, 1, figsize=(8, 12))
-    fig.suptitle(f'Separate Axes of Tag Over Time')
+    # # Create subplots for x, y, z signals: for plot indv function.
+    # # fig, (ax_x, ax_y, ax_z) = plt.subplots(3, 1, figsize=(8, 12))
+
+    # fig, (ax_x1, ax_y1, ax_z1, ax_roll1, ax_pitch1, ax_yaw1) = plt.subplots(6, 1, figsize=(8, 24))
+    # fig.suptitle(f'Separate Axes of Tag Over Time')
 
     ###########################    
             # External
@@ -1038,9 +1217,16 @@ if __name__ == "__main__":
     # ax_centroid = fig_centroid.add_subplot(111, projection='3d')
 
     ###########################
+            # Combined
+    ###########################
+    
+    # TODO: Give them apt legends in indv plots.
+    fig, (ax_x1, ax_y1, ax_z1, ax_roll1, ax_pitch1, ax_yaw1, centroid_x, centroid_y, centroid_z) = plt.subplots(9, 1, figsize=(8, 36))
+    fig.suptitle(f'Separate Axes of Tags Over Time')
+
+    ###########################
             # Telemetry
     ###########################
-
 
     while True:
 
@@ -1048,21 +1234,17 @@ if __name__ == "__main__":
                 # Internal
         ###########################
         
-        # rel_tag_poses = filter_false_positive()
-        rel_tag_poses = unfilter_rel_paths()
-        # plot_filtered_tags(rel_tag_poses, ax_x, ax_y, ax_z, tagA=5, tagB=0, tagC=14, tagD=5)
-        plot_filtered_tags_displacement(rel_tag_poses, ax_x, ax_y, ax_z, tagA=5, tagD=1)
-        
-        
+        # # rel_tag_poses = filter_false_positive()
+        # rel_tag_poses = unfilter_rel_paths()
+        # # plot_filtered_tags(rel_tag_poses, ax_x, ax_y, ax_z, tagA=5, tagB=0, tagC=14, tagD=5)
+        # plot_filtered_tags_displacement(rel_tag_poses, ax_x1, ax_y1, ax_z1, ax_roll1, ax_pitch1, ax_yaw1, tagA=5, tagD=1)
 
+        # # plot_idv(17, ax_x, ax_y, ax_z)                 # IMP ## x,y,z signals wrt time for a tag.
 
-        # plot_idv(17, ax_x, ax_y, ax_z)                 # IMP ## x,y,z signals wrt time for a tag.
-
-
-        # Unused: plot_idv_denoised( 19, 1, ax5, ax_x, ax_y, ax_z)  ## x,y,z signals wrt time for a tag denoised by static tag
-        # plot_6d_pose(ax1)
-        # plot_3d_relative_pose(ax2)
-        # plot_relative_pose_indv(1, ax3) 
+        # # Unused: plot_idv_denoised( 19, 1, ax5, ax_x, ax_y, ax_z)  ## x,y,z signals wrt time for a tag denoised by static tag
+        # # plot_6d_pose(ax1)
+        # # plot_3d_relative_pose(ax2)
+        # # plot_relative_pose_indv(1, ax3) 
 
         ###########################
                 # External
@@ -1074,6 +1256,14 @@ if __name__ == "__main__":
         # # plot_all_ext_tags(ax_centroid, all_frame_poses)
         # plot_centroid_path(ax_centroid, all_frame_poses, axis_equal=False)
 
+        ###########################
+                # Combined
+        ###########################
+
+        rel_tag_poses = unfilter_rel_paths()
+        all_frame_poses = read_frame_poses()
+        centroid_path = calculate_centroid_path(all_frame_poses)
+        plot_combined(centroid_path, rel_tag_poses, centroid_x, centroid_y, centroid_z, ax_x1, ax_y1, ax_z1, ax_roll1, ax_pitch1, ax_yaw1, tagA=5, tagB=1)
 
         ###########################
                 # Telemetry
