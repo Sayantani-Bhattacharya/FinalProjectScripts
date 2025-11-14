@@ -13,7 +13,149 @@ from scipy.spatial.transform import Rotation as R
 
 # External Cube Dimensions
 cube_size = 0.166  # meters   
-static_tag_id = 15  # Mid of the wisker arrays in seal head.
+static_tag_id = 4  # Mid of the wisker arrays in seal head.
+tag_rel_poses = {}  
+
+#######################################################################################
+#               Int Tag Thresholding to prevent false positives
+#######################################################################################
+
+# Input is csv file and output is filtered tag_paths: but what about the frames where no tags are visible?: checksum sort logic in the perception model pipeline. 
+# TODO: Edge Cases
+
+# Tag pose reference with quaternion fixed: Calculated from the static_ref script.
+internal_tag_id_rel_pose_map = {
+    0: {"position": [0.01431607, 0.04001835, -0.07066817], "quaternion": [0.7071, 0.0, 0.7071, 0.0]},
+    1: {"position": [0.00856013, 0.03377553, -0.04614408], "quaternion": [0.7071, 0.0, 0.7071, 0.0]},
+    2: {"position": [0.01684475, 0.03069469, -0.01257934], "quaternion": [0.7071, 0.0, 0.7071, 0.0]},
+    3: {"position": [-0.00075084, -0.05271414, -0.01421607], "quaternion": [0.09239, 0.3827, 0.0, 0.0]},
+    5: {"position": [-0.01197729, -0.04446193, -0.0077042], "quaternion": [0.09239, 0.3827, 0.0, 0.0]},
+    6: {"position": [-0.0211849, -0.03541196, -0.00963364], "quaternion": [0.09239, 0.3827, 0.0, 0.0]},
+    7: {"position": [-0.01306488, -0.03531467, 0.01683272], "quaternion": [0.09239, 0.3827, 0.0, 0.0]},
+    8: {"position": [-0.02081204, -0.05283257, -0.03941675], "quaternion": [0.09239, 0.3827, 0.0, 0.0]},
+    9: {"position": [-0.01011581, -0.05187832, -0.03616606], "quaternion": [0.09239, 0.3827, 0.0, 0.0]},
+    10: {"position": [-0.00087129, -0.04338111, 0.00374754], "quaternion": [0.09239, 0.3827, 0.0, 0.0]},
+    11: {"position": [0.00564222, 0.02567888, -0.03249634], "quaternion": [0.7071, 0.0, 0.7071, 0.0]},
+    12: {"position": [0.02347466, 0.04053535, -0.07390323], "quaternion": [0.7071, 0.0, 0.7071, 0.0]},
+    13: {"position": [-0.02242572, -0.04503598, -0.01635032], "quaternion": [0.09239, 0.3827, 0.0, 0.0]},
+    14: {"position": [0.01984042, 0.03416312, -0.05061772], "quaternion": [0.7071, 0.0, 0.7071, 0.0]},
+    16: {"position": [-0.00189823, 0.03547269, -0.03190359], "quaternion": [0.7071, 0.0, 0.7071, 0.0]},
+    17: {"position": [-0.00726191, 0.02756754, -0.01221053], "quaternion": [0.7071, 0.0, 0.7071, 0.0]},
+    18: {"position": [0.00206168, 0.03940511, -0.06486038], "quaternion": [0.7071, 0.0, 0.7071, 0.0]}
+}
+
+margin_error_position = 0.06 # 6 cm
+
+def unfilter_rel_paths():
+    # Read CSV and group by tag_id
+    tag_poses = {}
+    with open('frames_output_Cut_PT4/tag_paths_int.csv', 'r') as f: 
+        reader = csv.DictReader(f)
+        for row in reader:
+            tag_id = int(row['tag_id'])
+            frame_id = int(row['frame_id'])
+            tx = float(row['tx'])
+            ty = float(row['ty'])
+            tz = float(row['tz'])
+            qx = float(row['qx'])
+            qy = float(row['qy'])
+            qz = float(row['qz'])
+            qw = float(row['qw'])
+
+            if frame_id not in tag_poses:
+                tag_poses[frame_id] = {}
+            tag_poses[frame_id][tag_id] = (np.array([tx, ty, tz]), np.array([qx, qy, qz, qw]))
+
+    rel_tag_poses = {}
+
+    # For fixed frame_id, this will have all "19" poses and will iterate next to the next frame_id.
+    for frame_id, poses in tag_poses.items():
+        if static_tag_id not in poses: # this discards all frames where the static tag is not detected.
+            continue
+
+        static_pos, static_quaternion = poses[static_tag_id]
+        static_rot = R.from_quat(static_quaternion)
+
+        for tag_id, (pos, quat) in poses.items():
+            if tag_id == static_tag_id:
+                continue
+
+            # Check if tag_id is in the reference map
+            if tag_id not in internal_tag_id_rel_pose_map:
+                continue
+
+            rel_pos = static_rot.inv().apply(pos - static_pos)
+            rot = R.from_quat(quat)
+            rel_rot = static_rot.inv() * rot
+
+            # Use rel_pos and rel_rot for further processing.
+            if frame_id not in rel_tag_poses:
+                rel_tag_poses[frame_id] = {}
+            rel_tag_poses[frame_id][tag_id] = (rel_pos, rel_rot)
+        
+    return rel_tag_poses
+   
+
+def filter_false_positive():
+    # Read CSV and group by tag_id
+    tag_poses = {}
+    with open('frames_output_Cut_PT4/tag_paths_int.csv', 'r') as f: 
+        reader = csv.DictReader(f)
+        for row in reader:
+            tag_id = int(row['tag_id'])
+            frame_id = int(row['frame_id'])
+            tx = float(row['tx'])
+            ty = float(row['ty'])
+            tz = float(row['tz'])
+            qx = float(row['qx'])
+            qy = float(row['qy'])
+            qz = float(row['qz'])
+            qw = float(row['qw'])
+
+            if frame_id not in tag_poses:
+                tag_poses[frame_id] = {}
+            tag_poses[frame_id][tag_id] = (np.array([tx, ty, tz]), np.array([qx, qy, qz, qw]))
+
+    rel_tag_poses = {}
+
+    # For fixed frame_id, this will have all "19" poses and will iterate next to the next frame_id.
+    for frame_id, poses in tag_poses.items():
+        if static_tag_id not in poses: # this discards all frames where the static tag is not detected.
+            continue
+
+        static_pos, static_quaternion = poses[static_tag_id]
+        static_rot = R.from_quat(static_quaternion)
+
+        for tag_id, (pos, quat) in poses.items():
+            if tag_id == static_tag_id:
+                continue
+
+            # Check if tag_id is in the reference map
+            if tag_id not in internal_tag_id_rel_pose_map:
+                continue
+
+            rel_pos = static_rot.inv().apply(pos - static_pos)
+            rot = R.from_quat(quat)
+            rel_rot = static_rot.inv() * rot
+
+            # Check if the relative position is within margin error from the reference position.
+            ref_pos = np.array(internal_tag_id_rel_pose_map[tag_id]["position"])
+            if np.linalg.norm(rel_pos - ref_pos) > margin_error_position:
+                continue
+
+            # # Check if the relative rotation is within margin error from the reference quaternion.
+            # ref_quat = np.array(internal_tag_id_rel_pose_map[tag_id]["quaternion"])
+            # ref_rot = R.from_quat(ref_quat)
+            # if rel_rot.inv() * ref_rot.magnitude() > margin_error_position:
+            #     continue
+
+            # Use rel_pos and rel_rot for further processing.
+            if frame_id not in rel_tag_poses:
+                rel_tag_poses[frame_id] = {}
+            rel_tag_poses[frame_id][tag_id] = (rel_pos, rel_rot)
+        
+    return rel_tag_poses
+            
 
 #######################################################################################
 #                   Relative Pose wrt to Static Tag
